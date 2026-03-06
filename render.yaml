@@ -1,0 +1,16 @@
+# Render.com deployment config
+# Free tier: 750 hours/month, auto-sleep after 15 min inactivity
+services:
+  - type: web
+    name: reviewreply-ai
+    runtime: node
+    plan: free
+    buildCommand: "cd frontend && npm install && npm run build && cd ../backend && npm install"
+    startCommand: "cd backend && NODE_ENV=production node src/index.js"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OWNER_KEY
+        sync: false  # Set manually in Render dashboard (secret)
+      - key: ALLOWED_ORIGINS
+        sync: false  # Set to your Render URL, e.g. https://reviewreply-ai.onrender.com
