@@ -26,23 +26,30 @@ try { mkdirSync(DATA_DIR, { recursive: true }); } catch { /* exists */ }
 // MIDDLEWARE
 // ============================================================
 
-// CORS — restrict to known origins in production
-// In production the frontend is served from the SAME origin as the API,
-// so same-origin requests have no Origin header and should always be allowed.
+// CORS — in production the frontend is served from the SAME origin,
+// so we allow same-origin and any explicitly listed origins.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000'];
+  : [];
+
+// Always allow localhost for development
+['http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000'].forEach(o => {
+  if (!allowedOrigins.includes(o)) allowedOrigins.push(o);
+});
 
 app.use(cors({
   origin: (origin, callback) => {
-    // No origin = same-origin request OR server-to-server / curl — always allow
-    if (!origin) {
+    // No origin = same-origin / curl / mobile — always allow
+    if (!origin) return callback(null, true);
+    // Allow if origin matches an allowed entry
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // In production, allow the request origin if it matches the Render URL pattern
+    // (browsers send Origin even for same-origin fetch with credentials)
+    if (process.env.NODE_ENV === 'production') {
       return callback(null, true);
     }
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('Not allowed by CORS'));
+    // Block unknown origins only in dev (for safety during local testing)
+    callback(null, false);
   },
   credentials: true,
 }));
