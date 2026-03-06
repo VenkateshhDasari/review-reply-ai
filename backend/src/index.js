@@ -753,14 +753,20 @@ app.get('/api/health', (_req, res) => {
 });
 
 // --- Serve static frontend in production ---
+const frontendDist = join(__dirname, '..', '..', 'frontend', 'dist');
+
 if (process.env.NODE_ENV === 'production') {
-  const frontendDist = join(__dirname, '..', '..', 'frontend', 'dist');
+  console.log(`[STATIC] Serving frontend from: ${frontendDist}`);
+  console.log(`[STATIC] index.html exists: ${existsSync(join(frontendDist, 'index.html'))}`);
   app.use(express.static(frontendDist));
+  // SPA fallback — serve index.html for all non-API routes
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(join(frontendDist, 'index.html'));
     }
   });
+} else {
+  console.log(`[DEV] Not serving static files (NODE_ENV=${process.env.NODE_ENV})`);
 }
 
 app.listen(PORT, () => {
