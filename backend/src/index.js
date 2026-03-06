@@ -27,17 +27,19 @@ try { mkdirSync(DATA_DIR, { recursive: true }); } catch { /* exists */ }
 // ============================================================
 
 // CORS — restrict to known origins in production
+// In production the frontend is served from the SAME origin as the API,
+// so same-origin requests have no Origin header and should always be allowed.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000'];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc) in dev
-    if (!origin && process.env.NODE_ENV !== 'production') {
+    // No origin = same-origin request OR server-to-server / curl — always allow
+    if (!origin) {
       return callback(null, true);
     }
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
