@@ -2672,3 +2672,30 @@ select.text-input {
     transform: translateX(-50%) translateY(12px);
   }
 }
+
+/* ============================================================
+   UPGRADE BANNER (shown when free limit reached)
+   ============================================================ */
+
+.upgrade-banner {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.upgrade-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #a5b4fc;
+  margin-bottom: 0.5rem;
+}
+
+.upgrade-desc {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-bottom: 0.25rem;
+}

@@ -300,7 +300,22 @@ export const AnalyzePage = () => {
           </div>
 
           {progress && <p className="progress-text">{progress}</p>}
-          {error && <p className="error-text">{error}</p>}
+          {error && (
+            error.toLowerCase().includes('limit reached') ? (
+              <div className="upgrade-banner">
+                <p className="upgrade-title">You've hit your free limit this month!</p>
+                <p className="upgrade-desc">
+                  You've used all 15 free reviews. Upgrade to Pro for unlimited reviews,
+                  priority support, and advanced analytics.
+                </p>
+                <a href="/welcome" className="primary-button" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
+                  Learn About Pro
+                </a>
+              </div>
+            ) : (
+              <p className="error-text">{error}</p>
+            )
+          )}
         </div>
 
         <div className="layout-main-right">
