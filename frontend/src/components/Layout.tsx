@@ -6,6 +6,7 @@ import type { UsageInfo } from '../types';
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '📊' },
   { to: '/analyze', label: 'Analyze', icon: '💬' },
+  { to: '/inbox', label: 'Inbox', icon: '📬' },
   { to: '/insights', label: 'Insights', icon: '🔍' },
   { to: '/leads', label: 'Lead Finder', icon: '🎯' },
   { to: '/reports', label: 'Reports', icon: '📄' },

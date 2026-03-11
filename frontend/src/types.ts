@@ -97,6 +97,22 @@ export interface LeadFinderResponse {
   totalFound: number;
 }
 
+// ---- Review Inbox ----
+
+export type ReviewStatus = 'needs_reply' | 'reply_generated' | 'posted';
+
+export interface InboxReview {
+  id: string;
+  createdAt: string;
+  reviewText: string;
+  sentiment: Sentiment;
+  reply: string;
+  tone: Tone;
+  businessName: string;
+  status: ReviewStatus;
+  postedAt?: string;
+}
+
 // ---- Usage tracking ----
 
 export interface UsageInfo {

@@ -6,6 +6,7 @@ import { InsightsPage } from './pages/InsightsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LeadFinderPage } from './pages/LeadFinderPage';
+import { InboxPage } from './pages/InboxPage';
 import { LandingPage } from './pages/LandingPage';
 
 const NotFoundPage = () => (
@@ -24,6 +25,7 @@ export const App = () => (
     <Route element={<Layout />}>
       <Route index element={<DashboardPage />} />
       <Route path="analyze" element={<AnalyzePage />} />
+      <Route path="inbox" element={<InboxPage />} />
       <Route path="insights" element={<InsightsPage />} />
       <Route path="reports" element={<ReportsPage />} />
       <Route path="leads" element={<LeadFinderPage />} />

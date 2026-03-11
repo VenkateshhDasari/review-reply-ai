@@ -66,7 +66,7 @@ export const LandingPage = () => {
         </p>
         <div className="landing-hero-actions">
           <Link to="/analyze" className="landing-btn-primary">
-            Try Free — 15 Reviews/Month
+            Try Free — 5 Reviews/Month
           </Link>
           <a href="#pricing" className="landing-btn-secondary">
             View Pricing
@@ -209,7 +209,7 @@ export const LandingPage = () => {
               </div>
             </div>
             <ul className="landing-price-features">
-              <li>15 reviews per month</li>
+              <li>5 reviews per month</li>
               <li>Sentiment analysis</li>
               <li>Restaurant-smart replies</li>
               <li>Basic insights</li>
@@ -223,12 +223,12 @@ export const LandingPage = () => {
             <div className="landing-price-header">
               <h3 className="landing-price-name">Starter</h3>
               <div className="landing-price-amount">
-                <span className="landing-price-dollar">$19</span>
+                <span className="landing-price-dollar">$12</span>
                 <span className="landing-price-period">/month</span>
               </div>
             </div>
             <ul className="landing-price-features">
-              <li>100 reviews per month</li>
+              <li>30 reviews per month</li>
               <li>Everything in Free</li>
               <li>PDF reports</li>
               <li>Advanced insights dashboard</li>
@@ -244,7 +244,7 @@ export const LandingPage = () => {
             <div className="landing-price-header">
               <h3 className="landing-price-name">Pro</h3>
               <div className="landing-price-amount">
-                <span className="landing-price-dollar">$49</span>
+                <span className="landing-price-dollar">$29</span>
                 <span className="landing-price-period">/month</span>
               </div>
             </div>

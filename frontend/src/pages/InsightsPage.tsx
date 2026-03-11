@@ -5,6 +5,7 @@ import { ReputationScore } from '../components/ReputationScore';
 import { SentimentReport } from '../components/SentimentReport';
 import { ReviewInsights } from '../components/ReviewInsights';
 import { ImprovementSuggestions } from '../components/ImprovementSuggestions';
+import { computeScore, getScoreColor } from '../utils/score';
 import type { BatchResultItem, Improvement, SentimentSummary } from '../types';
 
 export const InsightsPage = () => {
@@ -56,7 +57,17 @@ export const InsightsPage = () => {
 
     const improvements = Object.values(improvementMap).sort((a, b) => b.mentionCount - a.mentionCount);
 
-    return { sentimentSummary, allResults, improvements };
+    // Trend data — score per session (most recent 12)
+    const trend = [...sessions]
+      .reverse()
+      .slice(-12)
+      .map(s => ({
+        label: new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        score: computeScore(s.sentimentSummary),
+        reviews: s.reviewCount,
+      }));
+
+    return { sentimentSummary, allResults, improvements, trend };
   }, [sessions]);
 
   if (!aggregated) {
@@ -93,6 +104,33 @@ export const InsightsPage = () => {
       <section className="card">
         <ReputationScore summary={aggregated.sentimentSummary} />
       </section>
+
+      {/* Reputation Trend */}
+      {aggregated.trend.length > 1 && (
+        <section className="card">
+          <div className="trend-chart">
+            <h3 className="trend-chart-title">Reputation Trend</h3>
+            <div className="trend-chart-bars">
+              {aggregated.trend.map((point, i) => {
+                const color = getScoreColor(point.score);
+                return (
+                  <div key={i} className="trend-bar-col" title={`${point.label}: ${point.score}/100 (${point.reviews} reviews)`}>
+                    <span className="trend-bar-score">{point.score}</span>
+                    <div
+                      className="trend-bar"
+                      style={{
+                        height: `${Math.max(point.score, 5)}%`,
+                        background: color,
+                      }}
+                    />
+                    <span className="trend-bar-label">{point.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Sentiment Overview */}
       <section className="card">

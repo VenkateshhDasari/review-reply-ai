@@ -1,10 +1,12 @@
-import type { AnalysisSession, BusinessProfile, ReportMetadata } from '../types';
+import type { AnalysisSession, BusinessProfile, InboxReview, ReportMetadata, ReviewStatus } from '../types';
 
 const PREFIX = 'rrai_';
 const SESSIONS_KEY = `${PREFIX}sessions`;
 const PROFILE_KEY = `${PREFIX}profile`;
 const REPORTS_KEY = `${PREFIX}reports`;
+const INBOX_KEY = `${PREFIX}inbox`;
 const MAX_SESSIONS = 20;
+const MAX_INBOX = 200;
 
 // ---- storage-full event ----
 
@@ -97,6 +99,43 @@ export function deleteReport(id: string): void {
   writeJson(REPORTS_KEY, reports);
 }
 
+// ---- Review Inbox ----
+
+export function getInboxReviews(): InboxReview[] {
+  return readJson<InboxReview[]>(INBOX_KEY, []);
+}
+
+export function addToInbox(reviews: InboxReview[]): void {
+  const inbox = getInboxReviews();
+  inbox.unshift(...reviews);
+  writeJson(INBOX_KEY, inbox.slice(0, MAX_INBOX));
+}
+
+export function updateInboxStatus(id: string, status: ReviewStatus): void {
+  const inbox = getInboxReviews();
+  const item = inbox.find(r => r.id === id);
+  if (item) {
+    item.status = status;
+    if (status === 'posted') item.postedAt = new Date().toISOString();
+    writeJson(INBOX_KEY, inbox);
+  }
+}
+
+export function deleteInboxReview(id: string): void {
+  const inbox = getInboxReviews().filter(r => r.id !== id);
+  writeJson(INBOX_KEY, inbox);
+}
+
+export function getInboxStats(): { total: number; needsReply: number; generated: number; posted: number } {
+  const inbox = getInboxReviews();
+  return {
+    total: inbox.length,
+    needsReply: inbox.filter(r => r.status === 'needs_reply').length,
+    generated: inbox.filter(r => r.status === 'reply_generated').length,
+    posted: inbox.filter(r => r.status === 'posted').length,
+  };
+}
+
 // ---- Waitlist ----
 
 const WAITLIST_KEY = `${PREFIX}waitlist_email`;
@@ -136,6 +175,7 @@ export function clearAllData(): void {
   localStorage.removeItem(SESSIONS_KEY);
   localStorage.removeItem(PROFILE_KEY);
   localStorage.removeItem(REPORTS_KEY);
+  localStorage.removeItem(INBOX_KEY);
   localStorage.removeItem(WAITLIST_KEY);
   localStorage.removeItem(LEADS_KEY);
 }

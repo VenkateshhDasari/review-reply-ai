@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
 const WAITLIST_FILE = join(DATA_DIR, 'waitlist.json');
 const USAGE_FILE = join(DATA_DIR, 'usage.json');
+const SESSIONS_FILE = join(DATA_DIR, 'sessions.json');
 
 // Ensure data directory exists
 try { mkdirSync(DATA_DIR, { recursive: true }); } catch { /* exists */ }
@@ -43,12 +44,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
     // Allow if origin matches an allowed entry
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    // In production, allow the request origin if it matches the Render URL pattern
-    // (browsers send Origin even for same-origin fetch with credentials)
-    if (process.env.NODE_ENV === 'production') {
-      return callback(null, true);
-    }
-    // Block unknown origins only in dev (for safety during local testing)
+    // Block unknown origins
     callback(null, false);
   },
   credentials: true,
@@ -56,6 +52,16 @@ app.use(cors({
 
 app.use(cookieParser());
 app.use(express.json({ limit: '100kb' })); // Explicit body size limit
+
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '0'); // Modern browsers: CSP is preferred, disable legacy filter
+  next();
+});
 
 // Trust proxy for correct IP behind reverse proxy (Render, Railway, etc.)
 app.set('trust proxy', 1);
@@ -215,10 +221,10 @@ function buildSmartResponse({ reviewText, businessName, sentiment, tone }) {
   const lower = reviewText.toLowerCase();
 
   const greetings = {
-    friendly: ['Hi there!', 'Hey, thanks for stopping by!', 'Hello!', 'Thanks so much for sharing!'],
-    professional: ['Thank you for your review.', 'We appreciate your feedback.', 'Thank you for taking the time to review us.'],
-    apologetic: ["We're truly sorry about your experience.", "We sincerely apologize.", "We're sorry to hear this."],
-    promotional: [`Thanks for choosing ${name}!`, `We're glad you visited ${name}!`, `Thank you for dining with us at ${name}!`]
+    friendly: ['Hi there!', 'Hey, thanks for stopping by!', 'Hello!', 'Thanks so much for sharing!', 'Hey there, thanks for the review!', 'Hi! We really appreciate you writing in.', 'Hello and thank you for the feedback!'],
+    professional: ['Thank you for your review.', 'We appreciate your feedback.', 'Thank you for taking the time to review us.', 'We value your detailed feedback.', 'Thank you for sharing your experience with us.', 'We appreciate you taking a moment to leave this review.'],
+    apologetic: ["We're truly sorry about your experience.", "We sincerely apologize.", "We're sorry to hear this.", "We regret that your visit wasn't up to par.", "We're disappointed to hear about your experience.", "This isn't the experience we aim to deliver, and we're sorry."],
+    promotional: [`Thanks for choosing ${name}!`, `We're glad you visited ${name}!`, `Thank you for dining with us at ${name}!`, `We're so happy you stopped by ${name}!`, `It was a pleasure having you at ${name}!`, `Welcome to the ${name} family!`]
   };
 
   const parts = [];
@@ -236,14 +242,21 @@ function buildSmartResponse({ reviewText, businessName, sentiment, tone }) {
         `We're thrilled you enjoyed the ${foodItem.value}! Our kitchen team takes real pride in getting it just right.`,
         `So happy to hear the ${foodItem.value} hit the spot! We'll pass the compliment to our chef.`,
         `The ${foodItem.value} is one of our favorites too! Glad it lived up to expectations.`,
-        `Our chef will be smiling ear to ear knowing you loved the ${foodItem.value}!`
+        `Our chef will be smiling ear to ear knowing you loved the ${foodItem.value}!`,
+        `Nothing makes us happier than hearing someone enjoyed our ${foodItem.value}. It's made fresh with care every single time.`,
+        `The ${foodItem.value} is crafted with a lot of attention to detail — so glad you noticed!`,
+        `We source the best ingredients for our ${foodItem.value}, and it's wonderful to know it shows.`,
+        `Our ${foodItem.value} has quite the fan following, and now you're part of it!`
       ];
       parts.push(foodResponses[Math.floor(Math.random() * foodResponses.length)]);
     } else if (topics.find(t => t.type === 'food_general')) {
       const generalFood = [
         'We put a lot of love into every dish that comes out of our kitchen, and it means the world to hear you enjoyed it.',
         "Hearing that you loved the food makes our day! We're passionate about quality ingredients and great flavors.",
-        "Our kitchen team works hard to deliver great food every time, and your review is the best reward!"
+        "Our kitchen team works hard to deliver great food every time, and your review is the best reward!",
+        "Great food starts with great ingredients, and we never cut corners. Glad you could taste the difference!",
+        "Our chef pours heart and soul into every plate — your compliment means everything to our kitchen crew.",
+        "We believe every meal should be memorable, and we're glad yours was!"
       ];
       parts.push(generalFood[Math.floor(Math.random() * generalFood.length)]);
     }
@@ -252,24 +265,41 @@ function buildSmartResponse({ reviewText, businessName, sentiment, tone }) {
       const staffResponses = [
         `We'll make sure to pass your kind words along to our ${staffMention.value} — it'll make their day!`,
         `Our team works hard to make every guest feel welcome, and reviews like yours remind us why.`,
-        `We're proud of our team and love hearing that they made your visit special!`
+        `We're proud of our team and love hearing that they made your visit special!`,
+        `Our ${staffMention.value} will be thrilled to hear this — they genuinely care about every guest's experience.`,
+        `Great service is at the heart of what we do. We'll share your kind words with the whole team!`,
+        `We hire people who love hospitality, and it shows. Thanks for recognizing our ${staffMention.value}!`
       ];
       parts.push(staffResponses[Math.floor(Math.random() * staffResponses.length)]);
     }
 
     if (ambianceMention) {
-      parts.push("We've worked hard to create a space where people feel comfortable and enjoy their time, so that means a lot!");
+      const ambianceResponses = [
+        "We've worked hard to create a space where people feel comfortable and enjoy their time, so that means a lot!",
+        "The atmosphere is something we obsess over — from the lighting to the music. So glad you felt it!",
+        "We want every visit to feel like a getaway, and it sounds like we delivered on that.",
+        "Creating the right vibe is just as important to us as the food. Thrilled you enjoyed the ambiance!"
+      ];
+      parts.push(ambianceResponses[Math.floor(Math.random() * ambianceResponses.length)]);
     }
 
     if (deliveryMention) {
-      parts.push("Glad the delivery experience was smooth! We work hard to make sure food arrives fresh and on time.");
+      const deliveryResponses = [
+        "Glad the delivery experience was smooth! We work hard to make sure food arrives fresh and on time.",
+        "We put just as much care into our delivery orders as our dine-in ones. Happy it showed!",
+        "Getting food to your door in perfect condition is a priority for us — glad we nailed it!"
+      ];
+      parts.push(deliveryResponses[Math.floor(Math.random() * deliveryResponses.length)]);
     }
 
     if (topics.length === 0) {
       const generalPositive = [
         "We're so glad you had a wonderful experience with us! Your kind words truly brighten our day.",
         "Reviews like yours are what keep our team motivated. Thank you for taking the time to share!",
-        "It means the world to us that you had a great experience. We can't wait to welcome you back!"
+        "It means the world to us that you had a great experience. We can't wait to welcome you back!",
+        "Your kind words just made everyone's shift. Thank you for spreading the positivity!",
+        "We work hard to make every visit special, and hearing it paid off is the best feeling.",
+        "This review put a smile on the whole team's face. Thank you for the love!"
       ];
       parts.push(generalPositive[Math.floor(Math.random() * generalPositive.length)]);
     }
@@ -278,7 +308,11 @@ function buildSmartResponse({ reviewText, businessName, sentiment, tone }) {
       `We can't wait to welcome you back to ${name}!`,
       `Hope to see you again soon! We've always got something delicious waiting for you.`,
       `Your next visit is on the horizon — we'll make it even better!`,
-      `Thanks again for the love! See you next time at ${name}.`
+      `Thanks again for the love! See you next time at ${name}.`,
+      `Come back anytime — there's always a table waiting for you at ${name}.`,
+      `Next time you're in, ask about our specials — we'd love to surprise you!`,
+      `You've made our day, and we'd love the chance to make yours again soon at ${name}!`,
+      `Counting the days until your next visit! We've got more deliciousness in store for you.`
     ];
     parts.push(positiveClosings[Math.floor(Math.random() * positiveClosings.length)]);
 
@@ -290,74 +324,151 @@ function buildSmartResponse({ reviewText, businessName, sentiment, tone }) {
     const priceMention = topics.find(t => t.type === 'pricing');
     const deliveryMention = topics.find(t => t.type === 'delivery');
 
-    parts.push("We sincerely apologize that your experience didn't meet our standards.");
+    const negativeOpeners = [
+      "We sincerely apologize that your experience didn't meet our standards.",
+      "We hold ourselves to a high standard, and we clearly fell short during your visit.",
+      "Your experience is not reflective of the quality we strive for every day.",
+      "We're truly disappointed to hear this, and we take full responsibility."
+    ];
+    parts.push(negativeOpeners[Math.floor(Math.random() * negativeOpeners.length)]);
 
     if (waitMention) {
       const waitResponses = [
         "We understand how frustrating long wait times can be, especially when you're hungry. We're actively working on improving our kitchen flow and staffing during peak hours.",
-        "Wait times like that are not acceptable to us. We're reviewing our processes to make sure this doesn't happen again."
+        "Wait times like that are not acceptable to us. We're reviewing our processes to make sure this doesn't happen again.",
+        "Your time matters, and we should have done better. We're restructuring our kitchen workflow to speed things up.",
+        "Nobody should have to wait that long for their meal. Our management team is addressing this head-on."
       ];
       parts.push(waitResponses[Math.floor(Math.random() * waitResponses.length)]);
     }
 
     if (foodItem || topics.find(t => t.type === 'food_general')) {
       if (lower.includes('cold')) {
-        parts.push("Food arriving cold is a serious issue we take to heart. We're reinforcing our quality checks to ensure every plate leaves the kitchen at the right temperature.");
+        const coldResponses = [
+          "Food arriving cold is a serious issue we take to heart. We're reinforcing our quality checks to ensure every plate leaves the kitchen at the right temperature.",
+          "Hot food should arrive hot — period. We're tightening up our plating-to-table process to fix this."
+        ];
+        parts.push(coldResponses[Math.floor(Math.random() * coldResponses.length)]);
       } else if (lower.includes('undercooked') || lower.includes('raw')) {
-        parts.push("Food safety is our top priority. We're immediately reviewing our cooking procedures with our kitchen team to prevent this.");
+        const undercookedResponses = [
+          "Food safety is our top priority. We're immediately reviewing our cooking procedures with our kitchen team to prevent this.",
+          "This is a serious concern and we've already flagged it with our head chef. We're retraining on proper cooking temperatures."
+        ];
+        parts.push(undercookedResponses[Math.floor(Math.random() * undercookedResponses.length)]);
       } else if (lower.includes('overcooked') || lower.includes('burnt')) {
-        parts.push("We pride ourselves on getting every dish right, and we clearly fell short here. Our chef has been made aware.");
+        const overcookedResponses = [
+          "We pride ourselves on getting every dish right, and we clearly fell short here. Our chef has been made aware.",
+          "That's not the quality we stand behind. We've spoken with our kitchen team about maintaining proper cooking times."
+        ];
+        parts.push(overcookedResponses[Math.floor(Math.random() * overcookedResponses.length)]);
       } else if (lower.includes('bland') || lower.includes('tasteless')) {
-        parts.push("We strive for bold, memorable flavors in every dish. We'll revisit our seasoning and preparation for consistency.");
+        const blandResponses = [
+          "We strive for bold, memorable flavors in every dish. We'll revisit our seasoning and preparation for consistency.",
+          "Flavor is everything to us, and we're sorry we missed the mark. Our chef is reviewing the recipes to ensure consistency."
+        ];
+        parts.push(blandResponses[Math.floor(Math.random() * blandResponses.length)]);
       } else {
-        parts.push("The food quality you described is not what we stand for. We're taking this feedback directly to our kitchen team.");
+        const generalFoodNeg = [
+          "The food quality you described is not what we stand for. We're taking this feedback directly to our kitchen team.",
+          "We expect excellence from every dish we serve, and your experience tells us we need to do better. We're on it."
+        ];
+        parts.push(generalFoodNeg[Math.floor(Math.random() * generalFoodNeg.length)]);
       }
     }
 
     if (staffMention) {
-      parts.push("Every guest deserves to be treated with respect and warmth. We're addressing this with our team immediately and will be conducting additional hospitality training.");
+      const staffNegResponses = [
+        "Every guest deserves to be treated with respect and warmth. We're addressing this with our team immediately and will be conducting additional hospitality training.",
+        "Hospitality is at our core, and what you experienced is unacceptable. We're having a direct conversation with our staff about this.",
+        "Our guests deserve better, and we're taking immediate steps to ensure our team delivers the welcoming service we're known for."
+      ];
+      parts.push(staffNegResponses[Math.floor(Math.random() * staffNegResponses.length)]);
     }
 
     if (cleanMention) {
-      parts.push("Cleanliness is non-negotiable for us. We're conducting an immediate review of our cleaning procedures and schedules.");
+      const cleanNegResponses = [
+        "Cleanliness is non-negotiable for us. We're conducting an immediate review of our cleaning procedures and schedules.",
+        "We take hygiene extremely seriously. Our manager has been notified and we're stepping up our cleaning protocols immediately."
+      ];
+      parts.push(cleanNegResponses[Math.floor(Math.random() * cleanNegResponses.length)]);
     }
 
     if (priceMention) {
-      parts.push("We want every guest to feel they got great value. We're reviewing our portions and pricing to ensure a fair experience.");
+      const priceNegResponses = [
+        "We want every guest to feel they got great value. We're reviewing our portions and pricing to ensure a fair experience.",
+        "Value matters, and we want you to feel good about what you paid. We're taking a fresh look at our pricing and portion sizes."
+      ];
+      parts.push(priceNegResponses[Math.floor(Math.random() * priceNegResponses.length)]);
     }
 
     if (deliveryMention) {
-      parts.push("We know how important it is that delivery orders arrive fresh and correct. We're working with our delivery process to improve this.");
+      const deliveryNegResponses = [
+        "We know how important it is that delivery orders arrive fresh and correct. We're working with our delivery process to improve this.",
+        "Delivery should be just as great as dining in. We're reviewing our packaging and handoff procedures to prevent this from happening again."
+      ];
+      parts.push(deliveryNegResponses[Math.floor(Math.random() * deliveryNegResponses.length)]);
     }
 
     if (topics.length === 0) {
-      parts.push("This is not the experience we want for any of our guests, and we take your feedback very seriously.");
+      const generalNeg = [
+        "This is not the experience we want for any of our guests, and we take your feedback very seriously.",
+        "We hold ourselves to a high standard, and your feedback is a clear signal that we need to step up.",
+        "Every guest matters to us, and we're genuinely sorry we let you down."
+      ];
+      parts.push(generalNeg[Math.floor(Math.random() * generalNeg.length)]);
     }
 
     const negativeClosings = [
       `We'd love the chance to make it up to you. Please reach out to us directly at ${name} so we can personally ensure your next visit is excellent.`,
       `Your feedback helps us get better. We hope you'll give us another chance to show you what ${name} is really about.`,
-      `We're committed to doing better. Please don't hesitate to contact us — we want to make this right.`
+      `We're committed to doing better. Please don't hesitate to contact us — we want to make this right.`,
+      `We value every guest and every review. If you're willing, we'd love to welcome you back and prove that ${name} can do better.`,
+      `Your honesty helps us improve, and we're grateful for it. We'd be honored if you gave ${name} another try.`,
+      `We don't take this lightly. Please reach out to our team — we'd like to personally make your next experience a great one.`
     ];
     parts.push(negativeClosings[Math.floor(Math.random() * negativeClosings.length)]);
 
   } else {
-    parts.push("We appreciate you sharing your honest feedback.");
+    const neutralOpeners = [
+      "We appreciate you sharing your honest feedback.",
+      "Thank you for your candid review — it helps us grow.",
+      "We're grateful for your honest take on your experience.",
+      "Feedback like yours is incredibly valuable to us."
+    ];
+    parts.push(neutralOpeners[Math.floor(Math.random() * neutralOpeners.length)]);
 
     if (topics.find(t => t.type === 'food_item' || t.type === 'food_general')) {
-      parts.push("We're always refining our menu and recipes, and feedback like yours helps us know where to focus.");
+      const neutralFoodResponses = [
+        "We're always refining our menu and recipes, and feedback like yours helps us know where to focus.",
+        "Our kitchen is constantly evolving, and your input gives us direction on what to improve next.",
+        "We're glad you tried our food and we'll use your feedback to keep raising the bar."
+      ];
+      parts.push(neutralFoodResponses[Math.floor(Math.random() * neutralFoodResponses.length)]);
     }
     if (topics.find(t => t.type === 'staff')) {
-      parts.push("We'll share your comments with our team so they can continue to improve.");
+      const neutralStaffResponses = [
+        "We'll share your comments with our team so they can continue to improve.",
+        "Our staff is always looking to improve, and we'll make sure your feedback reaches them.",
+        "We'll use your input in our next team meeting to help everyone grow."
+      ];
+      parts.push(neutralStaffResponses[Math.floor(Math.random() * neutralStaffResponses.length)]);
     }
     if (topics.length === 0) {
-      parts.push("Every review helps us identify areas where we can do better. We're always working to improve the experience at " + name + ".");
+      const neutralGeneral = [
+        "Every review helps us identify areas where we can do better. We're always working to improve the experience at " + name + ".",
+        "We take every review to heart and use it as a roadmap for where we can improve.",
+        "Honest feedback is how we keep getting better — thank you for helping us do that."
+      ];
+      parts.push(neutralGeneral[Math.floor(Math.random() * neutralGeneral.length)]);
     }
 
     const neutralClosings = [
       `We'd love to see you again and make your next experience at ${name} a standout one!`,
       `We value your feedback and hope to exceed your expectations next time at ${name}.`,
-      `Thanks for dining with us — we're committed to earning a better review next time!`
+      `Thanks for dining with us — we're committed to earning a better review next time!`,
+      `Come back and visit us at ${name} — we're always working on something new!`,
+      `We'd love another shot to wow you. Hope to see you again at ${name} soon!`,
+      `Your feedback is fuel for improvement. We hope to welcome you back to ${name} for an even better experience.`
     ];
     parts.push(neutralClosings[Math.floor(Math.random() * neutralClosings.length)]);
   }
@@ -474,7 +585,7 @@ function getUsage(ip) {
   return current;
 }
 
-const FREE_MONTHLY_LIMIT = 15;
+const FREE_MONTHLY_LIMIT = 5;
 
 // ============================================================
 // OWNER AUTHENTICATION (cookie-based, no key in frontend)
@@ -486,7 +597,12 @@ if (!OWNER_KEY) {
   console.warn('[WARN] OWNER_KEY not set in environment. Owner features disabled. Set OWNER_KEY in .env to enable.');
 }
 
-const OWNER_SESSION_TOKENS = new Set();
+// Load persisted sessions (survive server restarts)
+const OWNER_SESSION_TOKENS = new Set(loadJson(SESSIONS_FILE, []));
+
+function persistSessions() {
+  saveJson(SESSIONS_FILE, [...OWNER_SESSION_TOKENS]);
+}
 
 function isOwner(req) {
   const sessionToken = req.cookies?.rrai_owner_session;
@@ -538,8 +654,15 @@ function sanitizeText(text, maxLength) {
 // API ENDPOINTS
 // ============================================================
 
-// --- Owner login ---
-app.post('/api/owner/login', (req, res) => {
+// --- Owner login (rate-limited to prevent brute-force) ---
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+});
+app.post('/api/owner/login', loginLimiter, (req, res) => {
   const { key } = req.body || {};
   if (!OWNER_KEY) {
     return res.status(503).json({ error: 'Owner authentication is not configured.' });
@@ -549,6 +672,7 @@ app.post('/api/owner/login', (req, res) => {
   }
   const token = crypto.randomBytes(32).toString('hex');
   OWNER_SESSION_TOKENS.add(token);
+  persistSessions();
   res.cookie('rrai_owner_session', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -561,7 +685,10 @@ app.post('/api/owner/login', (req, res) => {
 
 app.post('/api/owner/logout', (req, res) => {
   const sessionToken = req.cookies?.rrai_owner_session;
-  if (sessionToken) OWNER_SESSION_TOKENS.delete(sessionToken);
+  if (sessionToken) {
+    OWNER_SESSION_TOKENS.delete(sessionToken);
+    persistSessions();
+  }
   res.clearCookie('rrai_owner_session', { path: '/' });
   return res.json({ success: true });
 });
@@ -695,7 +822,8 @@ const waitlist = loadJson(WAITLIST_FILE, []);
 
 app.post('/api/waitlist', waitlistLimiter, (req, res) => {
   const { email, businessName, phone } = req.body || {};
-  if (!email || typeof email !== 'string' || !email.includes('@') || email.length > 200) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || typeof email !== 'string' || !emailRegex.test(email.trim()) || email.length > 200) {
     return res.status(400).json({ error: 'Valid email required' });
   }
   if (waitlist.find(w => w.email === email.trim())) {
@@ -751,7 +879,8 @@ app.post('/api/leads/find', (req, res) => {
     return res.status(400).json({ error: 'City name is required' });
   }
   const cleanCity = sanitizeText(city, 100);
-  return res.json({ city: cleanCity, radius, totalFound: 0, leads: generateLeadData(cleanCity, radius) });
+  const leads = generateLeadData(cleanCity, radius);
+  return res.json({ city: cleanCity, radius, totalFound: leads.length, leads });
 });
 
 // --- Health check ---

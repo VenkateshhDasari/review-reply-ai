@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getProfile, getSessions, getReports } from '../utils/storage';
+import { getProfile, getSessions, getReports, getInboxStats } from '../utils/storage';
 import { computeScore, getScoreColor } from '../utils/score';
 
 export const DashboardPage = () => {
   const profile = getProfile();
   const sessions = getSessions();
   const reports = getReports();
+  const inboxStats = getInboxStats();
 
   const stats = useMemo(() => {
     const totalReviews = sessions.reduce((sum, s) => sum + s.reviewCount, 0);
@@ -31,6 +32,20 @@ export const DashboardPage = () => {
         </h1>
         <p className="page-subtitle">Your review management overview at a glance.</p>
       </div>
+
+      {/* First-time welcome */}
+      {sessions.length === 0 && (
+        <div className="demo-banner">
+          <div className="demo-banner-title">Welcome to ReviewReply AI</div>
+          <p className="demo-banner-text">
+            Paste your Google reviews, get instant sentiment analysis and professional responses.
+            Start with your first analysis to see your dashboard come to life.
+          </p>
+          <Link to="/analyze" className="primary-button" style={{ textDecoration: 'none', display: 'inline-block' }}>
+            Analyze Your First Reviews
+          </Link>
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="dashboard-stats">
@@ -73,11 +88,18 @@ export const DashboardPage = () => {
             <p className="action-desc">Paste reviews and generate responses</p>
           </div>
         </Link>
-        <Link to="/reports" className="action-card">
-          <span className="action-icon">📄</span>
+        <Link to="/inbox" className="action-card">
+          <span className="action-icon">📬</span>
           <div>
-            <h3 className="action-title">View Reports</h3>
-            <p className="action-desc">Download PDF analysis reports</p>
+            <h3 className="action-title">
+              Review Inbox
+              {inboxStats.needsReply + inboxStats.generated > 0 && (
+                <span style={{ color: '#f59e0b', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                  {inboxStats.needsReply + inboxStats.generated} pending
+                </span>
+              )}
+            </h3>
+            <p className="action-desc">Track replies from analysis to posted</p>
           </div>
         </Link>
         <Link to="/insights" className="action-card">
@@ -87,11 +109,11 @@ export const DashboardPage = () => {
             <p className="action-desc">Aggregated trends across all sessions</p>
           </div>
         </Link>
-        <Link to="/settings" className="action-card">
-          <span className="action-icon">⚙️</span>
+        <Link to="/reports" className="action-card">
+          <span className="action-icon">📄</span>
           <div>
-            <h3 className="action-title">Settings</h3>
-            <p className="action-desc">Manage your business profile</p>
+            <h3 className="action-title">View Reports</h3>
+            <p className="action-desc">Download PDF analysis reports</p>
           </div>
         </Link>
       </div>

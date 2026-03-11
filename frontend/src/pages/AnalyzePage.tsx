@@ -7,9 +7,44 @@ import { ImprovementSuggestions } from '../components/ImprovementSuggestions';
 import { ReputationScore } from '../components/ReputationScore';
 import { ReviewInsights } from '../components/ReviewInsights';
 import { exportCsv } from '../utils/exportCsv';
-import { getProfile, saveSession } from '../utils/storage';
+import { getProfile, saveSession, addToInbox } from '../utils/storage';
+import type { InboxReview } from '../types';
 
 const DEFAULT_TONE: Tone = 'friendly';
+
+// Quick-use response templates — no API call needed
+const RESPONSE_TEMPLATES = [
+  {
+    title: '5-Star Thank You',
+    scenario: 'Positive review, general praise',
+    text: `Thank you so much for the wonderful review! We're thrilled you had a great experience with us. Your kind words mean the world to our team, and we can't wait to welcome you back soon!`,
+  },
+  {
+    title: 'Food Complaint Response',
+    scenario: 'Customer unhappy with food quality',
+    text: `We're truly sorry that our food didn't meet your expectations. Quality is something we take very seriously, and we've shared your feedback directly with our kitchen team. We'd love the chance to make it right — please reach out to us so we can ensure your next visit is much better.`,
+  },
+  {
+    title: 'Wait Time Apology',
+    scenario: 'Customer frustrated by long wait',
+    text: `We sincerely apologize for the long wait during your visit. We understand how valuable your time is, and this isn't the experience we aim to provide. We're actively working on improving our service speed during peak hours. We hope you'll give us another chance to show you what we're really about.`,
+  },
+  {
+    title: 'Staff Behavior Apology',
+    scenario: 'Complaint about rude or poor service',
+    text: `We're deeply sorry about the service you received. Every guest deserves to be treated with respect and warmth, and we clearly fell short. We're addressing this directly with our team and conducting additional training. We'd love the opportunity to make this right.`,
+  },
+  {
+    title: 'Mixed Review Response',
+    scenario: 'Some positives, some negatives',
+    text: `Thank you for your honest feedback! We're glad you enjoyed some aspects of your visit, and we take your concerns about the areas where we fell short very seriously. We're working on improvements and would love to see you again soon.`,
+  },
+  {
+    title: 'Fake/Unfair Review',
+    scenario: 'Review seems inaccurate or fake',
+    text: `Thank you for taking the time to leave a review. We take all feedback seriously. However, we're unable to find a record matching the experience described. We'd love to learn more — please reach out to us directly so we can look into this further and address any genuine concerns.`,
+  },
+];
 
 // ---- API helpers ----
 
@@ -104,6 +139,7 @@ export const AnalyzePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -161,6 +197,21 @@ export const AnalyzePage = () => {
         };
         saveSession(session);
 
+        // Add to inbox for tracking
+        const inboxItems: InboxReview[] = data.results
+          .filter(r => !r.error)
+          .map((r, i) => ({
+            id: `${crypto.randomUUID()}-inbox-${i}`,
+            createdAt: now,
+            reviewText: r.reviewText,
+            sentiment: r.sentiment,
+            reply: r.reply,
+            tone,
+            businessName: businessName.trim() || 'Unnamed Business',
+            status: 'reply_generated' as const,
+          }));
+        addToInbox(inboxItems);
+
         setProgress('');
       } else {
         const { sentiment, reply } = await generateReplyApi(reviewText.trim(), tone, businessName.trim());
@@ -177,6 +228,18 @@ export const AnalyzePage = () => {
         };
 
         setHistory(prev => [entry, ...prev].slice(0, 50));
+
+        // Add to inbox for tracking
+        addToInbox([{
+          id: `${crypto.randomUUID()}-inbox`,
+          createdAt: entry.createdAt,
+          reviewText: reviewText.trim(),
+          sentiment,
+          reply,
+          tone,
+          businessName: businessName.trim() || 'Unnamed Business',
+          status: 'reply_generated' as const,
+        }]);
 
         // Auto-save single review as a session too
         const session: AnalysisSession = {
@@ -278,6 +341,42 @@ export const AnalyzePage = () => {
 
           <ToneSelector value={tone} onChange={setTone} />
 
+          {/* Quick Templates */}
+          <div className="templates-section">
+            <button
+              type="button"
+              className="templates-toggle"
+              onClick={() => setShowTemplates(prev => !prev)}
+            >
+              <span>{showTemplates ? '▼' : '▶'}</span>
+              Quick Templates — copy a ready-made response (no credits used)
+            </button>
+            {showTemplates && (
+              <div className="templates-grid">
+                {RESPONSE_TEMPLATES.map((tpl, i) => (
+                  <div
+                    key={i}
+                    className="template-card"
+                    onClick={() => {
+                      const personalized = businessName.trim()
+                        ? tpl.text + `\n\n— The ${businessName.trim()} Team`
+                        : tpl.text;
+                      navigator.clipboard.writeText(personalized)
+                        .then(() => showToast(`"${tpl.title}" copied!`))
+                        .catch(() => showToast('Failed to copy'));
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => e.key === 'Enter' && e.currentTarget.click()}
+                  >
+                    <p className="template-card-title">{tpl.title}</p>
+                    <p className="template-card-preview">{tpl.scenario} — click to copy</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="button-row">
             <button
               type="button"
@@ -305,11 +404,11 @@ export const AnalyzePage = () => {
               <div className="upgrade-banner">
                 <p className="upgrade-title">You've hit your free limit this month!</p>
                 <p className="upgrade-desc">
-                  You've used all 15 free reviews. Upgrade to Pro for unlimited reviews,
-                  priority support, and advanced analytics.
+                  You've used all 5 free reviews. Upgrade to Starter ($12/mo) for 30 reviews
+                  or Pro ($29/mo) for unlimited reviews and advanced analytics.
                 </p>
-                <a href="/welcome" className="primary-button" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
-                  Learn About Pro
+                <a href="/welcome#pricing" className="primary-button" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
+                  View Plans
                 </a>
               </div>
             ) : (
